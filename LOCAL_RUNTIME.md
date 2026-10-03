@@ -30,7 +30,7 @@ Commands (all from the repository root, all read `.env.local`):
 | `npm run replay -- A --protected` | One scripted scenario in the terminal (`A` to `F` or `all`; `--unprotected`; `--keep`) | none |
 | `npm run test:core` | Core tests (vitest). Test servers listen on port 0 (ephemeral). | none fixed |
 | `npm run core:db` | Applies `core/sql` schema, labels and seed to both databases. Additive. | none |
-| `npm run core:reset` | Empties the Breaker log and sessions, deletes tickets with id above 3, clears replies | none |
+| `npm run core:reset` | Empties the Breaker log and sessions, deletes tickets with id above 15, clears replies | none |
 | `npm run attack` | `core:reset`, then scenario A unprotected, then protected | none |
 
 Checks on 2026-10-03:

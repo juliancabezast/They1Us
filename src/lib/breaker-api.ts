@@ -286,7 +286,7 @@ export async function resetBreaker(): Promise<void> {
   const tickets = `${CUSTOMER_SCHEMA}.support_tickets`;
   const results = await Promise.allSettled([
     inTransaction(control, [`truncate breaker.events`, `delete from breaker.sessions`]),
-    inTransaction(customer, [`delete from ${tickets} where id > 3`, `update ${tickets} set reply = null`]),
+    inTransaction(customer, [`delete from ${tickets} where id > 15`, `update ${tickets} set reply = null`]),
   ]);
   const rejected = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
   if (rejected) throw rejected.reason;

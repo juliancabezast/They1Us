@@ -5,6 +5,7 @@ import type { BreakerEvent, BreakerLabel, BreakerState } from "@core/scenarios";
 import { RULES, type Rule } from "@core/types";
 import { Chip, Icon, button, time } from "../ui";
 import { DecisionLog } from "./ReferenceLog";
+import { Topology } from "./Topology";
 
 /** The order decide() checks them in. The first one that matches refuses the statement. */
 const RULE_ORDER: Rule[] = [
@@ -304,6 +305,16 @@ export function ReferenceView({
             </ol>
           </div>
         </div>
+      </Block>
+
+      <Block title="How it connects">
+        <div className="w-full max-w-[760px]">
+          <Topology />
+        </div>
+        <p className="mt-3 text-sm text-muted">
+          The Breaker sits between the company&apos;s AI agent and the company&apos;s database. It keeps its own database for sessions and
+          decisions and never copies the company&apos;s data.
+        </p>
       </Block>
 
       <Block title="Use it from your own agent">

@@ -284,7 +284,7 @@ describe("a reply is bounded", () => {
 
   it("one enormous row is dropped: the reply stays under the byte limit", async () => {
     const session = await newSession();
-    // About 1.6 MB in a single row (the seed's customer names repeated 200 000 times).
+    // About 20 MB in a single row (the seed's twelve customer names, 100 characters, repeated 200 000 times).
     const r = await guardedExecute(session, "SELECT string_agg(c.name, '') AS s FROM customers c, generate_series(1, 200000)");
     if (!r.ok) throw new Error(`expected an allow with rows, got ${r.rule}`);
     expect(r.truncated).toBe(true);

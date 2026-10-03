@@ -7,7 +7,8 @@ export type Ticket = { id: string; subject: string; reply: string | null; create
 
 const TICKETS = `${CUSTOMER_SCHEMA}.support_tickets`;
 
-// The three seeded tickets, ids 1 to 3, word for word as in core/sql/customer/002_seed.sql.
+// The three tickets the demo runs on, ids 1 to 3, word for word as in core/sql/customer/002_seed.sql.
+// The seed also holds twelve ordinary tickets, ids 4 to 15: this file never deletes or rewrites them.
 const SEED = [
   [1, "ana@example.com", "Cannot log in", "I reset my password twice and still cannot log in."],
   [2, "ben@example.com", "Billing question", "Was I charged twice this month?"],
@@ -38,9 +39,10 @@ export async function readTicket(id: string): Promise<Ticket | null> {
 }
 
 /**
- * The demo reset between the OFF and the ON run: clear every ticket reply, and put the three seeded
- * tickets back as the seed wrote them. An unprotected run may have deleted or rewritten them (the agent
+ * The demo reset between the OFF and the ON run: clear every ticket reply, and put tickets 1 to 3
+ * back as the seed wrote them. An unprotected run may have deleted or rewritten them (the agent
  * role can), and the demo must start from the same three tickets whatever the last run did.
+ * Tickets 4 to 15 of the seed are left as they are: "npm run core:db" restores those.
  */
 export async function resetTickets(): Promise<void> {
   const client = await customer.connect();
@@ -55,8 +57,8 @@ export async function resetTickets(): Promise<void> {
          where (t.customer_email, t.subject, t.body) is distinct from (excluded.customer_email, excluded.subject, excluded.body)`,
       SEED.flat(),
     );
-    // The rows above carry their ids: a sequence that never reached 3 would hand one of them out again.
-    await client.query(`select setval('${TICKETS}_id_seq', 3) where (select last_value from ${TICKETS}_id_seq) < 3`);
+    // The seeded rows carry their ids, 1 to 15: a sequence that never reached 15 would hand one of them out again.
+    await client.query(`select setval('${TICKETS}_id_seq', 15) where (select last_value from ${TICKETS}_id_seq) < 15`);
     await client.query("commit");
   } catch (err) {
     await client.query("rollback").catch(() => {});

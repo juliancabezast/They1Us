@@ -550,3 +550,53 @@ button {
     display: none;
   }
 }
+
+/* ---------- not in the original: the demo's attack tickets, one click to fill the form ---------- */
+:where(.victim) .samples {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px dashed #e3c98f;
+  border-radius: 10px;
+  background: var(--warn-soft);
+}
+
+:where(.victim) .samples-title {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+:where(.victim) .samples-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+:where(.victim) .sample {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 13px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+:where(.victim) .sample:hover {
+  border-color: var(--accent);
+}
+
+:where(.victim) .sample.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+:where(.victim) .samples-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}

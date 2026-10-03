@@ -69,12 +69,12 @@ const readSeeded = async (): Promise<Ticket[]> =>
   ).rows;
 
 beforeAll(async () => {
-  // The three oldest tickets are the seed. Tickets filed by runs (ours or anybody's) always come after them.
+  // The fifteen lowest ids are the seed. Tickets filed by runs (ours or anybody's) always come after them.
   const { rows } = await customer.query<Ticket>(
-    `select id, customer_email, subject, body, reply from ${TICKETS} order by id limit 3`,
+    `select id, customer_email, subject, body, reply from ${TICKETS} order by id limit 15`,
   );
   seeded = rows;
-  expect(seeded).toHaveLength(3);
+  expect(seeded).toHaveLength(15);
   expect(seeded.filter((t) => t.body.includes(INJECTION_MARKER))).toHaveLength(1);
 });
 
@@ -227,7 +227,7 @@ describe("guardedExecute", () => {
 
   it(`caps the rows at ${ROW_CAP} and says so`, async () => {
     const session = await newSession();
-    // The seed has three customers: 3^5 = 243 rows, and customers carry no label.
+    // The seed has twelve customers: 12^5 = 248 832 rows, and customers carry no label.
     const r = await guardedExecute(
       session,
       "SELECT a.id FROM customers a, customers b, customers c, customers d, customers e",
@@ -298,7 +298,7 @@ describe("guardedExecute", () => {
 });
 
 describe("fixtures", () => {
-  it("the three seeded tickets are untouched, the malicious one still without a reply", async () => {
+  it("the fifteen seeded tickets are untouched, the malicious one still without a reply", async () => {
     const now = await readSeeded();
     expect(now).toEqual(seeded);
     expect(now.find((t) => t.body.includes(INJECTION_MARKER))?.reply).toBeNull();

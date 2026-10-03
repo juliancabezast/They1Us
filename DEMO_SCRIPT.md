@@ -101,7 +101,7 @@ The four runs below (A, C, D, E) take about 48 s of playback in total. The rest 
 |---|---|---|
 | 1 | Scenario **A** is selected. Point at the three statements in both lanes. | "Same agent, same three SQL statements, sent twice: straight to the database, and through the Breaker." |
 | 2 | Press **Run scenario**. The log below empties. | "Left, Breaker off: nothing checks them." |
-| 3 | Left lane, *What the attacker sees*. | "The ticket reply now holds both tokens. They are fictitious values. This is what the attacker reads." |
+| 3 | Left lane, *What the attacker sees*. | "The ticket reply now holds the tokens. They are fictitious values. This is what the attacker reads." |
 | 4 | Right lane, statement 1 (on screen 5 s; press `Space` to hold it). | "Reading the tickets is allowed. The session is now stamped untrusted." |
 | 5 | Right lane, statement 2 (7 s). | "Reading the tokens is refused: `R2_TRIFECTA_MIX`. One session cannot hold untrusted data and secrets." |
 | 6 | Right lane, statement 3 (7 s). | "The write is refused too: `R3_TAINTED_WRITE`. The reply is empty. Nothing left the database." |
@@ -122,14 +122,14 @@ The **Victim** button, top right of the dashboard, opens the Demo Helpdesk under
 
 | Step | Do | Say |
 |---|---|---|
-| 1 | Click **Victim**. On the form, paste the first ticket of `DEMO_ATTACK_TICKETS.md` (in the Victim_Web repository) and submit. Note the ticket number. | "This is a customer's support form. The attacker only writes text." |
+| 1 | Click **Victim**. Under **Attack tickets for the demo**, press **A** (it fills the form), then **Submit request**. Note the ticket number. | "This is a customer's support form. The attacker only writes text." |
 | 2 | **Agent console**, switch **OFF**, **Process today's tickets**. | "The support AI reads the tickets, obeys the hidden note, reads the tokens and writes one into the reply." |
 | 3 | Click **Open ticket** at the end of the log. | "The attacker reads their own ticket. The token is there." |
 | 4 | Back in the console: **Reset replies**, switch **ON**, **Process** again. | "Same ticket, same agent. The token read is refused, `R2`. The write is refused, `R3`." |
 | 5 | Open the ticket again. | "No reply. The AI was still fooled; it just could not reach anything." |
 | 6 | **Trifecta Breaker** link, **SQL Breaker** tab, decision log. | "Every decision of that session is here, with the rule and the stamps before and after." |
 
-The seeded ticket 3 already carries the injection, so steps 2 to 5 work without filing a ticket. Without a model key on the server the console runs the scripted agent, which sends the same three statements every time.
+The seven attack tickets (A to G) come from the Victim_Web project (`docs/attack-prompts.md`). Only **A** carries the marker the scripted agent looks for; B to G are for the live model. The seeded ticket 3 already carries the injection, so steps 2 to 5 work without filing a ticket. Without a model key on the server the console runs the scripted agent, which sends the same three statements every time.
 
 ## Terminal fallback
 

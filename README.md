@@ -59,6 +59,10 @@ Where it differs from the original project: it uses this project's customer tabl
 
 ## Architecture
 
+![Architecture: the Breaker between the AI agent and the company database](docs/architecture.svg)
+
+Diagram by the Victim_Web project (docs/architecture.svg), translated to English.
+
 Operation catalog and dashboard:
 
 ```
@@ -166,7 +170,7 @@ None of these routes accepts SQL, except the hosted mirror in the last row, whic
 | `POST /api/breaker/reset` | Operator | Empties the Breaker log, deletes every Breaker session and the rehearsal tickets. |
 | `POST /api/breaker/sessions`, `POST /api/breaker/execute` | Callers with `BREAKER_API_KEY` | The hosted mirror of the Breaker API. Answers 503 when the key is not set. |
 | `POST /api/victim/process` | Anyone, 6 per minute per visitor, 20 in all | The victim app's agent run. Body `{ breakerOn, scripted }`, two booleans. Streams the agent's steps as NDJSON. |
-| `POST /api/victim/reset` | Anyone | The victim app's **Reset replies**: clears the reply of every ticket in the customer tables and restores the three seeded tickets. |
+| `POST /api/victim/reset` | Anyone | The victim app's **Reset replies**: clears the reply of every ticket in the customer tables and restores tickets 1 to 3 of the seed, the ones the demo depends on. |
 
 The limits of 12 and 40 are counted per server process and do not apply to a signed-in operator. Both demo routes refuse requests without a same-origin `Origin` header (403).
 
