@@ -10,6 +10,7 @@ import { VictimLink } from "@/components/VictimLink";
 import { AttackLab } from "@/components/views/AttackLab";
 import { AuditLog } from "@/components/views/AuditLog";
 import { Overview } from "@/components/views/Overview";
+import { LiveService } from "@/components/views/LiveService";
 import { Policies } from "@/components/views/Policies";
 import { Sessions } from "@/components/views/Sessions";
 import { SqlBreaker } from "@/components/views/SqlBreaker";
@@ -19,6 +20,7 @@ import type { DashboardState } from "@/lib/types";
 const VIEWS = [
   ["overview", "Overview"],
   ["sql-breaker", "SQL Breaker"],
+  ["live-service", "Live service"],
   ["attack-lab", "Attack Lab"],
   ["sessions", "Sessions"],
   ["policies", "Policies"],
@@ -291,6 +293,8 @@ export default function Dashboard() {
                 <Overview state={state} {...props} />
               ) : view === "sql-breaker" ? (
                 <SqlBreaker />
+              ) : view === "live-service" ? (
+                <LiveService />
               ) : view === "attack-lab" ? (
                 <AttackLab state={state} {...props} />
               ) : view === "sessions" ? (
