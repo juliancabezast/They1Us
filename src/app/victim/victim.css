@@ -1,0 +1,552 @@
+/* Demo Helpdesk styles: app/globals.css of the Victim_Web project, rule for rule.
+   Every selector is scoped with :where(.victim), which adds no specificity, so the helpdesk's own
+   cascade is the original one (its CSS module classes still beat the element rules, as they did there)
+   and nothing leaks into the dashboard. This file is unlayered, so it wins over Tailwind's reset. */
+
+/* ---------- browser defaults the original relied on and Tailwind's reset removes ----------
+   Kept before the helpdesk rules so those still override them, as they override the browser. */
+:where(.victim) h1,
+:where(.victim) h2,
+:where(.victim) h3,
+:where(.victim) h4 {
+  font-weight: bold;
+}
+
+:where(.victim) pre,
+:where(.victim) code,
+:where(.victim) kbd,
+:where(.victim) samp {
+  font-family: monospace;
+}
+
+:where(.victim) small {
+  font-size: smaller;
+}
+
+:where(.victim) {
+  tab-size: 8;
+}
+
+:where(.victim) input,
+:where(.victim) textarea {
+  color: fieldtext;
+}
+
+:where(.victim) ::placeholder {
+  color: darkgray;
+}
+
+:where(.victim) input[type="checkbox"] {
+  margin: 3px 3px 3px 4px;
+}
+
+/* The dashboard draws its own focus ring on everything; the helpdesk keeps the browser's. */
+.victim :focus-visible {
+  outline: auto 1px -webkit-focus-ring-color;
+  outline-offset: 0;
+}
+
+/* The original paints <body>; behind the wrapper the dashboard's dark body would show on overscroll. */
+html:has(.victim) {
+  color-scheme: light;
+}
+
+body:has(.victim) {
+  background: #f4f6fa;
+}
+
+/* ---------- app/globals.css ---------- */
+.victim {
+  --fg: #16181d;
+  --muted: #5b6472;
+  --faint: #8a93a2;
+  --bg: #f4f6fa;
+  --card: #ffffff;
+  --border: #e4e8ef;
+  --border-strong: #d2d8e2;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef0fe;
+  --danger: #dc2626;
+  --danger-soft: #fdeceb;
+  --ok: #15803d;
+  --ok-soft: #e7f5ec;
+  --warn: #b7791f;
+  --warn-soft: #fdf3e0;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
+  --radius: 12px;
+  color-scheme: light;
+}
+
+:where(.victim),
+:where(.victim) *,
+:where(.victim) ::before,
+:where(.victim) ::after {
+  box-sizing: border-box;
+}
+
+/* html, body { margin: 0; padding: 0 }: Tailwind's reset already does it for the document. */
+
+/* The original styles <body>; here the wrapper stands in for it. */
+:where(.victim) {
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+:where(.victim) a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+:where(.victim) a:hover {
+  text-decoration: underline;
+}
+
+:where(.victim) h1 {
+  font-size: 28px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+:where(.victim) h2 {
+  font-size: 17px;
+  margin: 0 0 12px;
+  letter-spacing: -0.01em;
+}
+
+:where(.victim) p {
+  margin: 0 0 12px;
+}
+
+:where(.victim) input,
+:where(.victim) textarea,
+:where(.victim) button,
+:where(.victim) select {
+  font: inherit;
+}
+
+:where(.victim) /* ---------- top bar ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+:where(.victim) .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+:where(.victim) .brand:hover {
+  text-decoration: none;
+}
+
+:where(.victim) .brand .logo {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #7c73ff);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+:where(.victim) .brand small {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+:where(.victim) .topnav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+:where(.victim) .topnav a {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 14px;
+  padding: 7px 12px;
+  border-radius: 8px;
+}
+
+:where(.victim) .topnav a:hover {
+  color: var(--fg);
+  background: var(--accent-soft);
+  text-decoration: none;
+}
+
+:where(.victim) .topbar .spacer {
+  margin-left: auto;
+}
+
+:where(.victim) .userchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--card);
+}
+
+:where(.victim) .userchip .avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+:where(.victim) /* ---------- layout ---------- */
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 20px 72px;
+}
+
+:where(.victim) .narrow {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+:where(.victim) .footer {
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 18px 24px;
+  font-size: 12.5px;
+  color: var(--faint);
+  text-align: center;
+}
+
+:where(.victim) .footer strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+:where(.victim) /* ---------- cards & bits ---------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
+:where(.victim) .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+
+:where(.victim) .lead {
+  color: var(--muted);
+  font-size: 15.5px;
+}
+
+:where(.victim) .muted {
+  color: var(--muted);
+}
+
+:where(.victim) .error {
+  color: var(--danger);
+}
+
+:where(.victim) .success {
+  color: var(--ok);
+}
+
+:where(.victim) /* ---------- buttons ---------- */
+button {
+  cursor: pointer;
+}
+
+:where(.victim) .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14.5px;
+  transition: background 0.12s ease;
+}
+
+:where(.victim) .btn:hover {
+  background: var(--accent-hover);
+}
+
+:where(.victim) .btn.secondary {
+  background: var(--card);
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+
+:where(.victim) .btn.secondary:hover {
+  background: #f8f9fc;
+}
+
+:where(.victim) .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+:where(.victim) /* ---------- ticket form ---------- */
+.ticket-form {
+  display: grid;
+  gap: 18px;
+  margin: 4px 0 0;
+}
+
+:where(.victim) .ticket-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+:where(.victim) .ticket-form input,
+:where(.victim) .ticket-form textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 14.5px;
+  font-weight: 400;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+:where(.victim) .ticket-form input:focus,
+:where(.victim) .ticket-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+:where(.victim) .ticket-form textarea {
+  resize: vertical;
+}
+
+:where(.victim) .ticket-form .hint {
+  font-weight: 400;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+:where(.victim) .ticket-form .btn {
+  justify-self: start;
+}
+
+:where(.victim) .notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+
+:where(.victim) .notice.ok {
+  background: var(--ok-soft);
+  border-color: #bfe3cb;
+  color: #11662e;
+}
+
+:where(.victim) .notice.bad {
+  background: var(--danger-soft);
+  border-color: #f4c7c4;
+  color: #a31b1b;
+}
+
+:where(.victim) /* ---------- ticket view ---------- */
+.ticket-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+:where(.victim) .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+:where(.victim) .status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+:where(.victim) .status.open {
+  background: var(--warn-soft);
+  border-color: #eed9ac;
+  color: var(--warn);
+}
+
+:where(.victim) .status.replied {
+  background: var(--ok-soft);
+  border-color: #bfe3cb;
+  color: var(--ok);
+}
+
+:where(.victim) .meta-row {
+  color: var(--faint);
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+:where(.victim) .convo-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin: 0 0 8px;
+}
+
+:where(.victim) .reply {
+  margin: 0;
+  padding: 16px 18px;
+  min-height: 72px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: var(--shadow-sm);
+}
+
+:where(.victim) .reply.empty {
+  color: var(--faint);
+  border-left-color: var(--border-strong);
+  border-style: dashed;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+}
+
+/* ---------- not in the original ---------- */
+
+/* The way back to the dashboard this app is embedded in. */
+:where(.victim) .backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:where(.victim) .backlink:hover {
+  color: var(--fg);
+  text-decoration: none;
+  border-color: var(--border-strong);
+}
+
+/* "Refresh" on the ticket page is a button that refetches; it reads as the link it was. */
+:where(.victim) .linklike {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+}
+
+:where(.victim) .linklike:hover {
+  text-decoration: underline;
+}
+
+/* The top bar carries one more item than the original (it needs about 820px on one line), so it
+   sheds the least useful pieces as the screen narrows instead of wrapping or overflowing. */
+:where(.victim) .brand,
+:where(.victim) .topnav a,
+:where(.victim) .userchip {
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  :where(.victim) .userchip {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  :where(.victim) .topbar {
+    gap: 10px;
+    padding: 0 14px;
+  }
+  :where(.victim) .brand small {
+    display: none;
+  }
+}
+
+@media (max-width: 580px) {
+  /* The logo alone; the link keeps its name through aria-label. */
+  :where(.victim) .brand > span:not(.logo) {
+    display: none;
+  }
+}
+
+@media (max-width: 450px) {
+  /* The logo already leads to the help center. */
+  :where(.victim) .topnav a:first-child {
+    display: none;
+  }
+}

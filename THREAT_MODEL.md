@@ -45,10 +45,27 @@ Anything that does not go through `guardedExecute`: other tools the agent has (w
 - The application's database login is over-privileged (owner). Pending: a dedicated login role with only what the gateway needs.
 - Approvals are bound to content by SHA-256 and expire after 10 minutes; there is no review of *why* the agent asked.
 - Public replay endpoints are rate limited globally, not per client.
+- **Two public routes delete demo data, by design.** See the next section.
 - Session ids are unguessable UUIDs but are bearer handles; a real deployment would bind them to an authenticated agent identity.
 - No automated labeling, no multi-tenancy.
 
+## Public routes that delete demo data
+
+`POST /api/demo/run` (the Live demo) and `POST /api/breaker/demo` (**Run scenario** in the SQL Breaker tab) need no sign-in and delete rows before they run. This is deliberate: the data is synthetic and the owner wants every demo to start clean. `POST /api/demo/run` truncates the dashboard's demo tables (`tb_events`, `tb_approvals`, `tb_sessions`, `tb_contexts` and the dashboard database's `support_tickets`), which includes pending approvals and anything the operator's workflow wrote. Both routes delete the Breaker sessions labeled `replay:` that are older than 4 seconds, and their rows in the decision log. They cannot delete more than that: they take no SQL and no table name (one takes no body, the other a scenario letter `A` to `F`), they never touch Breaker sessions opened through the HTTP API or the MCP server, never the label rows, and never the customer's tickets other than the one each scripted run files and removes itself. What remains is an availability problem, accepted for the demo: anyone who can reach the dashboard can clear the shared demo board for everyone looking at it, as often as the rate limit allows (12 runs per minute for the Live demo, 40 for the SQL Breaker tab, counted per server process and shared by all anonymous callers). The same-origin check stops other websites, not scripts. A clear that lands while another run is in flight, from another server instance or a test run, can make that run answer 500. A deployment that holds real data must not ship these two routes.
+
 ---
+
+## The embedded victim app
+
+`/victim` is a deliberately vulnerable demo target. One weakness is intended: with the Breaker off, an instruction hidden in a ticket makes the support agent copy a fictitious token into a ticket reply. Everything else is meant to hold.
+
+- The browser sends two booleans to `POST /api/victim/process`, never SQL. With the Breaker on, the agent's statements go through `guardedExecute` in a new session per run.
+- With the Breaker off, the scripted agent sends three fixed statements. Each runs alone, with the extended protocol, in a transaction as the role `breaker_agent`, which can read and write the three customer tables and nothing else. A statement that ends as another role is rolled back, and the connection is cleaned before it returns to the pool.
+- The live model with the Breaker off is disabled unless the server sets `VICTIM_UNSAFE_LIVE_OFF=1`. Reason: the app logs in as the database owner and only switches role, and one model-written statement can borrow that login back (`set_config`) and read as the owner. A public server must not set the flag. The fix that would remove the flag is a separate database login for the agent role; it is not built.
+- The form and the run route check the origin and have budgets per visitor (5 tickets and 6 runs per minute) under a ceiling for the whole site (30 and 20). A signed-in operator is not limited. The budgets are counted per server process.
+- **Reset replies** clears every reply and puts the three seeded tickets back. It does not delete tickets filed by visitors; `npm run core:reset` does.
+
+What an attacker can still do through it: fill the tickets table within the budgets, change which ticket the scripted run targets by filing a newer ticket with the marker text, and read any ticket's reply by guessing its number (the reply page is public by design).
 
 # Threat model: SQL Breaker (`core/`)
 
@@ -98,7 +115,7 @@ The policy is the first control. Two more sit under it in Postgres and do not de
 - **Browsers on other sites.** A request with an `Origin` that is not allowed is refused with 403 before anything runs, preflight included. A `Host` that is not `localhost`, `127.0.0.1`, `[::1]`, `HOST` or in `BREAKER_ALLOWED_HOSTS` gets 421 (DNS rebinding). `POST /execute` requires `application/json`, which a page cannot send to another site without a preflight.
 - **Bodies** are capped at 100 kB, also when chunked.
 - **The hosted mirror** (`/api/breaker/sessions`, `/api/breaker/execute` in the Next.js app) exists only when `BREAKER_API_KEY` is set and the caller sends it. It does not apply the Origin, Host and content-type checks of `core/src/server.ts`.
-- **The dashboard's own routes** take a scenario id, never SQL. `GET /api/breaker/state` is public and returns the decision log with session ids cut to 8 characters, because a full session id is all the Breaker API asks for to act on a session.
+- **The dashboard's own routes** take a scenario id, never SQL. `POST /api/breaker/demo` is public and deletes earlier scripted runs from the decision log before it runs (see "Public routes that delete demo data" above). `GET /api/breaker/state` is public and returns the decision log with session ids cut to 8 characters, because a full session id is all the Breaker API asks for to act on a session.
 
 ## Trusted components
 

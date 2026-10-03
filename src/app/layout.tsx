@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Figtree, Source_Code_Pro } from "next/font/google";
-import { LiveDemo } from "@/components/LiveDemo";
 import "./globals.css";
 
 // Supabase sets its brand in Circular, a licensed typeface we cannot ship.
@@ -28,7 +27,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <LiveDemo />
       </body>
     </html>
   );

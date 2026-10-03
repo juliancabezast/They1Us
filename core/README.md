@@ -214,7 +214,7 @@ Resets both databases (`sql/breaker/003_reset.sql`, `sql/customer/003_reset.sql`
 npm run test:core
 ```
 
-Runs `vitest run` over `core/test/**/*.test.ts` against the real databases. On 2026-10-03: 7 files, 175 tests passed in about 21 s (policy, analyzer, breaker, server, mcp, redteam, web). Each test asserts only on sessions and tickets it created.
+Runs `vitest run` over `core/test/**/*.test.ts` against the real databases. On 2026-10-03: 7 files, 175 tests passed in about 21 s (policy, analyzer, breaker, server, mcp, redteam, web). Each test asserts only on sessions and tickets it created. Later that day `demo.test.ts` was added for the two demo routes of the dashboard: 8 files, 179 tests passed in 22.6 s, run once. That file clears the dashboard's demo history and deletes scripted Breaker sessions older than 4 seconds, like the routes it tests; its assertion on `tb_contexts` can fail if someone runs the Live demo at the same moment.
 
 ### MCP server
 
@@ -287,6 +287,7 @@ This form gives the MCP process only `BREAKER_URL` (add `-e BREAKER_API_KEY=...`
 - Availability is only partly handled. Two sessions sending slow statements occupy both slots, and everyone else waits or gets 503 once 50 are queued. The limits are per process.
 - The 1 MB reply cap is applied after the rows arrive. A statement that builds one huge value still costs memory until the 5 s timeout (measured: resident memory peaked at 190 MB for a 20 MB row). Writes with `RETURNING` are not wrapped in a `LIMIT` and are buffered whole.
 - There is no rate limit.
+- The dashboard's **Run scenario** button and its Live demo delete earlier scripted runs from the decision log: sessions labeled `replay:` that are older than 4 seconds, with their events. Sessions opened through the HTTP API or the MCP server are never deleted by them. The log is therefore not a permanent record of scripted runs.
 - The MCP server builds its requests from the origin of `BREAKER_URL`, so it cannot be pointed at the hosted mirror under `/api/breaker/`.
 
 **The demo**

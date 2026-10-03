@@ -22,14 +22,16 @@ The repository has two independent implementations of that rule, for two kinds o
 | After untrusted content was read | Writes are refused (`R3_TAINTED_WRITE`) | Output needs a human approval bound to the exact text and recipient |
 | Reachable over | Its own HTTP API (`POST /sessions`, `POST /execute`), an MCP server, or a function call | The dashboard's operator routes |
 | Databases | Customer DB (the data) and Breaker DB (`breaker.*`) | The dashboard database (`tb_*` tables) |
-| Dashboard tab | **SQL Breaker** | **Attack Lab**, **Sessions**, **Policies**, **Audit Log** |
+| Dashboard tab | **SQL Breaker** | **Overview** (the Live demo), **Attack Lab**, **Sessions**, **Policies**, **Audit Log** |
 | Docs | `core/README.md`, `core/INTEGRATION.md` | This file |
 
 ### SQL Breaker
 
 The Breaker sits between an agent and the customer's database. Only the Breaker holds the customer's connection string. Every statement is analyzed with `EXPLAIN`, judged by a pure policy function, logged, and only then run, as a least-privilege database role. Rules, scenarios, setup and limitations are in `core/README.md`. The request and response format for another app is in `core/INTEGRATION.md`.
 
-The **SQL Breaker** tab replays six scripted scenarios (A to F). Pick one and press **Run scenario**. The same statements go down two lanes: *Breaker off* (straight to the customer's database) and *Breaker on* (through the checkpoint). Each lane shows what the attacker would see in the ticket reply. Below the lanes: the decision log, the labeled columns, the rules in the order they are checked, and three snippets for calling the Breaker from another agent. The tab never sends SQL from the browser: the run route takes a scenario id and a mode.
+The **SQL Breaker** tab replays six scripted scenarios (A to F). Pick one and press **Run scenario**. The same statements go down two lanes: *Breaker off* (straight to the customer's database) and *Breaker on* (through the checkpoint). Each lane shows what the attacker would see in the ticket reply. Below the lanes: the decision log, the labeled columns, the rules in the order they are checked, and three snippets for calling the Breaker from another agent.
+
+One click sends one request, `POST /api/breaker/demo { scenario }`. The server first deletes the earlier scripted runs from the decision log, then runs the scenario in both modes. The statements then appear one at a time in both lanes: 5 s each, 7 s when the Breaker refuses one, with **Pause** / **Resume** and **Next statement** under the run button (`Space` and `ArrowRight`). The tab never sends SQL from the browser: the route takes a scenario id and nothing else. No operator sign-in is needed.
 
 ### Operation catalog
 
@@ -38,6 +40,22 @@ The **SQL Breaker** tab replays six scripted scenarios (A to F). Pick one and pr
 - Labels accumulate on a **context** (the root of an agent run). A context may never hold `secret` and `untrusted` together. The gateway judges the state the context would be in *after* the operation.
 - Output from a context that read untrusted content needs a **human approval** bound to the exact text and recipient. Output from a context that holds a secret is refused.
 - Every decision is written to an audit table and streamed to the dashboard with Supabase Realtime.
+
+### Live demo
+
+The **Live demo** is a panel at the top of **Overview**, inside the page. One click on **Run live demo** sends one request, `POST /api/demo/run`. The server deletes the demo history, then replays the same attack twice through the operation catalog layer: first in the unprotected sandbox, then through the gateway. The panel then plays eleven lines by itself, in four chapters (Ticket, Leak, Breaker, Contained). Each line stays between 4.5 and 9 s depending on its length; the whole playback takes 66 s. **Back**, **Pause** / **Resume** and **Next** are under the line, and the keys `Space`, `ArrowLeft`, `ArrowRight` and `Escape` do the same. Every result on screen is a row that request wrote. No operator sign-in is needed. From any other tab, a **Live demo** button goes to Overview and starts it. The presenter's script is in `DEMO_SCRIPT.md`.
+
+### Victim app
+
+The **Victim** button at the top right of the dashboard opens the Demo Helpdesk: a fictional, deliberately vulnerable support app built by a teammate (repository `JustinFutureBillionaire/Victim_Web`) and embedded here under `/victim` with its own look. It is the target of the attack, not part of the product.
+
+- `/victim`: the public form. Anyone files a ticket; the attacker hides an instruction for the AI in the message.
+- `/victim/admin`: the staff console. A Breaker ON/OFF switch, **Process today's tickets** and an action log of every SQL statement the support AI sends.
+- `/victim/ticket/<id>`: the reply as the customer sees it. This is where the attacker reads the leaked token.
+
+With the Breaker off, the agent's SQL reaches the customer's tables unchecked and the fictitious token lands in the reply. With it on, every statement goes through `guardedExecute`: the token read is refused (`R2`) and so is the write (`R3`). Those sessions also appear in the decision log of the **SQL Breaker** tab.
+
+Where it differs from the original project: it uses this project's customer tables and calls the Breaker in process instead of over HTTP; with the Breaker off each statement still runs one at a time as the least-privilege role, not as the database owner; without `ANTHROPIC_API_KEY` on the server only the scripted agent runs (the live model path is ported and was not exercised here), and the live model with the Breaker off also needs `VICTIM_UNSAFE_LIVE_OFF=1`, which is for a local demo only (see `THREAT_MODEL.md`).
 
 ## Architecture
 
@@ -58,12 +76,15 @@ guardedExecute ── policy.ts (catalog + decide) ── Postgres transaction
 fixed parameterized statement, run as role tb_executor (no access to tb_* tables)
 ```
 
+`POST /api/demo/run` (the Live demo, public, no body) clears the demo history and then calls both paths of this diagram on the server: the sandbox executor first, then the agent runtime through `guardedExecute`.
+
 SQL Breaker:
 
 ```
 agent ── POST /execute {sessionId, sql} ──▶ Breaker API (core/src/server.ts, port 3150)
 agent ── MCP tool execute_sql ── HTTP ────▶        │
-dashboard tab ── /api/breaker/run {scenario, mode} ─┤ (scripted SQL only)
+dashboard tab ── /api/breaker/demo {scenario} ──────┤ (scripted SQL only; clears earlier
+                 /api/breaker/run {scenario, mode}  │  replay rows, then runs both modes)
                                                     ▼
                                     guardedExecute (core/src/breaker.ts)
                                       │ analyzer.ts: pre-check, EXPLAIN, plan walk
@@ -82,6 +103,8 @@ dashboard tab ── /api/breaker/run {scenario, mode} ─┤ (scripted SQL only
 | `src/lib/gateway.ts` | `guardedExecute`, contexts, sessions, approvals, audit. |
 | `src/lib/sandbox.ts` | The unprotected executor. Separate code path; refuses non-sandbox contexts. |
 | `src/lib/runs.ts` | The two demo runs: attack replay and legitimate workflow. |
+| `src/lib/demo-api.ts`, `src/app/api/demo/run/` | `POST /api/demo/run`: clears the demo history and runs the attack replay unprotected, then protected. Answers `{ off, on }`. |
+| `src/components/LiveDemo.tsx`, `src/components/demo/` | The Live demo panel on Overview and its timeline (the eleven lines and how long each stays). |
 | `src/lib/explain.ts` | Diagnostic only: plans each catalog statement with `EXPLAIN` and compares the columns with the declaration. |
 | `src/lib/operator.ts` | Operator sign-in cookie, Origin/Host check. |
 | `supabase/schema.sql` | Tables, RLS, executor role, Realtime, seed. **Drops and recreates the demo tables.** |
@@ -95,8 +118,8 @@ dashboard tab ── /api/breaker/run {scenario, mode} ─┤ (scripted SQL only
 | `core/src/mcp.ts` | The Breaker as a stdio MCP server (tool `execute_sql`). Talks to the HTTP API only. |
 | `core/src/scenarios.ts`, `runner.ts`, `replay.ts` | The six scripted scenarios, the runner, and the CLI. |
 | `core/sql/breaker/`, `core/sql/customer/`, `core/sql/apply.ts` | Schema, labels, seed and reset for each database, and the script that applies them. |
-| `core/test/` | 175 tests in 7 files against the real databases (`npm run test:core`). |
-| `src/lib/breaker-api.ts`, `src/app/api/breaker/` | Dashboard routes for the SQL Breaker tab (`run`, `state`, `reset`) and the hosted mirror of the Breaker API (`sessions`, `execute`). |
+| `core/test/` | 179 tests in 8 files against the real databases (`npm run test:core`). |
+| `src/lib/breaker-api.ts`, `src/app/api/breaker/` | Dashboard routes for the SQL Breaker tab (`demo`, `run`, `state`, `reset`) and the hosted mirror of the Breaker API (`sessions`, `execute`). |
 | `src/components/views/SqlBreaker.tsx`, `src/components/breaker/` | The SQL Breaker tab. |
 
 ## Install and run
@@ -117,11 +140,35 @@ npm run breaker                    # the Breaker HTTP API on http://127.0.0.1:31
 npm run replay -- A --protected    # one scenario in the terminal; also --unprotected, all, --keep
 npm run attack                     # reset both databases, then A unprotected, then A protected
 npm run core:reset                 # empty the decision log, delete sessions and rehearsal tickets
-npm run test:core                  # vitest, 175 tests against the real databases
+npm run test:core                  # vitest, 179 tests against the real databases
 npm run -s mcp                     # the MCP server on stdio (needs the HTTP API running)
 ```
 
 `npm run attack` and `npm run core:reset` delete every Breaker session and event. The SQL Breaker tab works without `npm run breaker`: the dashboard calls the core in process.
+
+## Dashboard routes
+
+None of these routes accepts SQL, except the hosted mirror in the last row, which needs the key.
+
+| Route | Who | Does |
+|---|---|---|
+| `GET /api/state` | Anyone | The dashboard's state, read only. |
+| `POST /api/demo/run` | Anyone, 12 per minute | The Live demo. No body. Deletes the demo history (`tb_events`, `tb_approvals`, `tb_sessions`, `tb_contexts`, `support_tickets` of the dashboard database) and the scripted runs older than 4 seconds in the Breaker log, then runs the attack replay in the sandbox and through the gateway. Answers `{ off, on }`, each `{ contextId, events, ticket }`. Errors: 403, 429, 500. |
+| `POST /api/sandbox/attack` | Anyone, until 30 contexts were created in the last minute | One attack replay on the unprotected sandbox (Attack Lab). Clears nothing. |
+| `POST /api/runs/attack` | Anyone, until 30 contexts were created in the last minute | One attack replay through the gateway (Attack Lab). Clears nothing. |
+| `POST /api/runs/workflow` | Operator | The legitimate workflow. |
+| `POST /api/approvals/[id]` | Operator | Approve or reject a held output. |
+| `POST /api/reset` | Operator | **Clear history**: deletes the demo history of the dashboard database. |
+| `POST /api/operator`, `DELETE /api/operator` | Anyone | Operator sign-in with the passcode, and sign-out. |
+| `POST /api/breaker/demo` | Anyone, 40 per minute shared with `run` | The SQL Breaker tab. Body `{ scenario }`, `A` to `F`. Deletes the scripted runs older than 4 seconds from the Breaker log, then runs the scenario unprotected and protected. Answers `{ off, on }`. Errors: 400, 403, 413, 429, 500. |
+| `POST /api/breaker/run` | Anyone, 40 per minute | One scenario in one mode, body `{ scenario, mode }`. Clears nothing. |
+| `GET /api/breaker/state` | Anyone | The decision log, with session ids cut to 8 characters. |
+| `POST /api/breaker/reset` | Operator | Empties the Breaker log, deletes every Breaker session and the rehearsal tickets. |
+| `POST /api/breaker/sessions`, `POST /api/breaker/execute` | Callers with `BREAKER_API_KEY` | The hosted mirror of the Breaker API. Answers 503 when the key is not set. |
+| `POST /api/victim/process` | Anyone, 6 per minute per visitor, 20 in all | The victim app's agent run. Body `{ breakerOn, scripted }`, two booleans. Streams the agent's steps as NDJSON. |
+| `POST /api/victim/reset` | Anyone | The victim app's **Reset replies**: clears the reply of every ticket in the customer tables and restores the three seeded tickets. |
+
+The limits of 12 and 40 are counted per server process and do not apply to a signed-in operator. Both demo routes refuse requests without a same-origin `Origin` header (403).
 
 Variables in `.env.local` (never commit values):
 
@@ -151,7 +198,9 @@ The SQL Breaker is written for two databases. Today both of its connection strin
 
 - Demo database, synthetic data. `tokens.read_integration` exists only to show the mechanism; a real integration would keep the credential on the server and never return it.
 - The app connects as the database owner and switches to `tb_executor` only for the catalog statement. Production would use a dedicated login role.
-- One operator, one shared passcode, no accounts. Attack replays are public (rate limited); the workflow, approvals and clearing history need the operator.
+- One operator, one shared passcode, no accounts. Attack replays are public (rate limited); the workflow, approvals and the **Clear history** button need the operator.
+- The Live demo (`POST /api/demo/run`) and **Run scenario** (`POST /api/breaker/demo`) are public and delete demo data on every run, by design: the data is synthetic and every run starts clean. Anyone can clear the shared demo board for everyone else. A deployment with real data must not ship these two routes. Details in `THREAT_MODEL.md`.
+- The Live demo runs one at a time per server process. With several instances, or with the test suite running against the same database, one run can delete the rows of another that is in flight; that run then answers 500. Not tested under concurrency.
 - The catalog has four operations. Real coverage means writing and reviewing an entry per operation.
 - The agent in the demo is a deterministic replay. A model-driven agent would use the same gateway; it is not included.
 - SQL Breaker: the Breaker HTTP API has no authentication unless `BREAKER_API_KEY` is set. It binds to `127.0.0.1` for that reason.

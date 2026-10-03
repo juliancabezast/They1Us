@@ -56,6 +56,8 @@ async function fetchState(signal: AbortSignal): Promise<BreakerState> {
 export interface Loaded {
   /** The request this result answers. Anything else on screen means a request is still out. */
   key: string;
+  /** The `refreshKey` this result answers. An older one may hold rows the server has cleared since. */
+  run: number;
   data: BreakerState | null;
   /** When `data` arrived. */
   at: string | null;
@@ -124,14 +126,19 @@ function Snippet({ title, code, children }: { title: string; code: string; child
  * Decision log, labels, rules and how to plug the Breaker into an agent. Refetches when `refreshKey`
  * changes, and on its own every few seconds while the page is visible and not `paused`, so statements
  * sent by other clients (the HTTP API, the MCP server, the victim app) appear without a click.
+ * Every run clears the log on the server, so while `paused` (a run is on screen) and until the request
+ * that follows it has answered, the rows of the run before are not shown.
  */
 export function BreakerReference({ refreshKey, paused = false }: { refreshKey: number; paused?: boolean }) {
   const [manual, setManual] = useState(0);
   const [tick, setTick] = useState(0);
   const requestKey = `${refreshKey}:${manual}`;
-  const [loaded, setLoaded] = useState<Loaded>({ key: "", data: null, at: null, error: null });
+  const [loaded, setLoaded] = useState<Loaded>({ key: "", run: refreshKey, data: null, at: null, error: null });
   // A poll never cuts off a request that is still out: on a slow network that would starve the log.
   const waiting = useRef(false);
+  // The last request somebody asked for, and how many polls in a row have failed since.
+  const asked = useRef("");
+  const misses = useRef(0);
 
   useEffect(() => {
     if (paused) return;
@@ -149,14 +156,19 @@ export function BreakerReference({ refreshKey, paused = false }: { refreshKey: n
 
   useEffect(() => {
     const request = new AbortController();
+    // Same key as last time: nobody asked, this is the poll.
+    const poll = asked.current === requestKey;
+    asked.current = requestKey;
     waiting.current = true;
     fetchState(request.signal).then(
       (data) => {
         if (request.signal.aborted) return;
         waiting.current = false;
+        misses.current = 0;
         // Nothing new keeps the same object, so the rows on screen are not touched at all.
         setLoaded((last) => ({
           key: requestKey,
+          run: refreshKey,
           data: last.data && JSON.stringify(last.data) === JSON.stringify(data) ? last.data : data,
           at: new Date().toISOString(),
           error: null,
@@ -165,22 +177,56 @@ export function BreakerReference({ refreshKey, paused = false }: { refreshKey: n
       (err: unknown) => {
         if (request.signal.aborted) return;
         waiting.current = false;
+        misses.current += 1;
+        // One poll that lands while the server is clearing the log is not news: the next one is seconds away.
+        if (poll && misses.current < 2) return;
         // A failed refresh keeps the last log on screen: stale decisions are still true decisions.
-        setLoaded((last) => ({ ...last, key: requestKey, error: err instanceof Error ? err.message : "The decision log could not be loaded." }));
+        // Unless a run has cleared them since: then they are gone, and showing them would be wrong.
+        setLoaded((last) => ({
+          ...last,
+          key: requestKey,
+          run: refreshKey,
+          data: last.run === refreshKey ? last.data : null,
+          at: last.run === refreshKey ? last.at : null,
+          error: err instanceof Error ? err.message : "The decision log could not be loaded.",
+        }));
       },
     );
     return () => {
       request.abort();
       waiting.current = false;
     };
-  }, [requestKey, tick]);
+  }, [requestKey, refreshKey, tick]);
 
-  return <ReferenceView loaded={loaded} loading={loaded.key !== requestKey} onRefresh={() => setManual((n) => n + 1)} />;
+  return (
+    <ReferenceView
+      loaded={loaded}
+      loading={loaded.key !== requestKey}
+      cleared={paused || loaded.run !== refreshKey}
+      onRefresh={() => setManual((n) => n + 1)}
+    />
+  );
 }
 
+// One array for every cleared render, so the memoized log is not redrawn while a run plays.
+const NO_EVENTS: BreakerEvent[] = [];
+
 /** Everything on screen, given what the last request brought back. No fetching in here. */
-export function ReferenceView({ loaded, loading, onRefresh }: { loaded: Loaded; loading: boolean; onRefresh: () => void }) {
-  const { data, at, error } = loaded;
+export function ReferenceView({
+  loaded,
+  loading,
+  cleared = false,
+  onRefresh,
+}: {
+  loaded: Loaded;
+  loading: boolean;
+  /** A run has cleared the log on the server and the rows that replace it are not here yet. */
+  cleared?: boolean;
+  onRefresh: () => void;
+}) {
+  const { data, at } = loaded;
+  // What was loaded before the clear is neither shown nor reported as a problem.
+  const error = cleared ? null : loaded.error;
   const problem = error
     ? `${error} ${at ? `Showing what was loaded at ${time(at)}.` : "The rules and the setup below do not depend on it."}`
     : "";
@@ -191,14 +237,14 @@ export function ReferenceView({ loaded, loading, onRefresh }: { loaded: Loaded; 
         title="Decision log"
         aside={
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {data && (
+            {data && !cleared && (
               <ul className="flex flex-wrap gap-x-4 gap-y-1">
                 <Figure value={data.totals.allowed} label="allowed" />
                 <Figure value={data.totals.denied} label="denied" />
                 <Figure value={data.totals.sessions} label={data.totals.sessions === 1 ? "session" : "sessions"} />
               </ul>
             )}
-            <button type="button" onClick={onRefresh} disabled={loading} className={button.secondary}>
+            <button type="button" onClick={onRefresh} disabled={loading || cleared} className={button.secondary}>
               Refresh
             </button>
           </div>
@@ -211,14 +257,16 @@ export function ReferenceView({ loaded, loading, onRefresh }: { loaded: Loaded; 
         </p>
         {!error && (
           <p className="text-xs text-muted">
-            {at
-              ? `Updated at ${time(at)}. Statements sent through the API, the MCP server or another app show up here within seconds.`
-              : "Loading the decision log."}
+            {cleared
+              ? "Every run starts from an empty log. The decisions of this one show up when its last statement has landed."
+              : at
+                ? `Updated at ${time(at)}. Statements sent through the API, the MCP server or another app show up here within seconds.`
+                : "Loading the decision log."}
           </p>
         )}
         {data && (
           <div className="mt-3">
-            <DecisionLog events={data.events} />
+            <DecisionLog events={cleared ? NO_EVENTS : data.events} waiting={cleared} />
           </div>
         )}
       </Block>
@@ -235,7 +283,7 @@ export function ReferenceView({ loaded, loading, onRefresh }: { loaded: Loaded; 
             {data ? (
               <Labels labels={data.labels} />
             ) : (
-              <p className="text-sm text-muted">{error ? "The labels come with the decision log, which could not be loaded." : "Loading the labels."}</p>
+              <p className="text-sm text-muted">{loaded.error ? "The labels come with the decision log, which could not be loaded." : "Loading the labels."}</p>
             )}
           </div>
           <div className="min-w-0">

@@ -159,6 +159,67 @@ export async function runReply(request: Request, deps: RunDeps = { run: runScena
   }
 }
 
+/** Only the scenario is read, and only a value from the closed list passes. Everything else in the body is ignored. */
+export function parseDemoRequest(body: unknown): { scenario: ScenarioId } | null {
+  if (typeof body !== "object" || body === null) return null;
+  const s = SCENARIO_IDS.find((id) => id === (body as Record<string, unknown>).scenario);
+  return s ? { scenario: s } : null;
+}
+
+/**
+ * Removes the sessions of earlier scripted runs from the Breaker log (their events go with them: on delete cascade).
+ * Only label "replay:…": sessions opened through the HTTP API or the MCP server are other people's live sessions.
+ * The 4 seconds protect a run that is in flight right now (another visitor's, or a test's): a protected run
+ * whose session vanished would fail, and a scripted run answers in well under a second. It must stay shorter
+ * than the shortest run on screen (one refused statement, about 6 seconds), or the run before stays in the log.
+ * Customer tickets are not touched: the runner removes its own.
+ */
+export async function clearReplaySessions(): Promise<void> {
+  await control.query(`delete from breaker.sessions where label like 'replay:%' and created_at < now() - interval '4 seconds'`);
+}
+
+interface DemoDeps extends RunDeps {
+  clear: () => Promise<void>;
+}
+
+/**
+ * POST /api/breaker/demo. One scenario, both modes, on a log cleared of earlier replays: the data is
+ * synthetic and every demo starts clean, so no operator sign-in. Same checks as runReply; it never carries SQL.
+ * `deps` exists for the tests.
+ */
+export async function breakerDemoReply(
+  request: Request,
+  deps: DemoDeps = { run: runScenario, limiter: runLimiter, clear: clearReplaySessions },
+): Promise<Response> {
+  if (!sameOrigin(request)) return forbidden("Cross-origin request refused.");
+  const text = await readBody(request, RUN_BODY_BYTES).catch(() => "");
+  if (text === null) return failed("Request body too large.", 413);
+  let body: unknown = null;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // Not JSON: answered below like any other body that does not name a scenario.
+  }
+  const demo = parseDemoRequest(body);
+  if (!demo) return failed("Expected { scenario: A to F }.", 400);
+
+  const operator = operatorFrom(request) !== null;
+  // One slot for the pair: the limit counts requests, like the run route.
+  if (!operator && !deps.limiter.take()) return failed("Too many demo runs right now. Try again in a minute.", 429);
+  try {
+    await deps.clear();
+    // Each run files its own ticket and opens its own session, so the two cannot step on each other.
+    const [off, on] = await Promise.all([deps.run(demo.scenario, "unprotected"), deps.run(demo.scenario, "protected")]);
+    return Response.json(
+      { off: forCaller(off, operator), on: forCaller(on, operator) },
+      { headers: { "cache-control": "no-store" } },
+    );
+  } catch (err) {
+    logFailure("demo", err);
+    return failed("The scenario could not be run.", 500);
+  }
+}
+
 const EVENT_LIMIT = 60;
 const SESSION_LIMIT = 20;
 

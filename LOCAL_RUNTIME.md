@@ -24,7 +24,7 @@ Commands (all from the repository root, all read `.env.local`):
 
 | Command | Does | Port |
 |---|---|---|
-| `npm run dev` | Dashboard | 3140 |
+| `npm run dev` | Dashboard. The Live demo (top of Overview) and **Run scenario** (SQL Breaker tab) delete demo rows on every run. | 3140 |
 | `npm run breaker` | Breaker HTTP API | 3150 |
 | `npm run -s mcp` | MCP server on stdio; calls the Breaker HTTP API | none |
 | `npm run replay -- A --protected` | One scripted scenario in the terminal (`A` to `F` or `all`; `--unprotected`; `--keep`) | none |
@@ -41,3 +41,12 @@ Checks on 2026-10-03:
 - `curl -X POST http://localhost:3150/sessions` returned `201` with a session id. `POST /execute` with `SELECT body FROM support_tickets` returned `200`, `decision: allow`, 3 rows. The same session asking for `integration_tokens` returned `200`, `decision: deny`, `R2_TRIFECTA_MIX`.
 - After SIGTERM, `lsof -tiTCP:3150 -sTCP:LISTEN` printed nothing, `curl` to 3150 got no connection, and `http://127.0.0.1:3140` still returned `200`.
 - `npm run test:core`: 7 files, 175 tests passed.
+- Later the same day, after `core/test/demo.test.ts` was added: `npx vitest run`, 8 files, 179 tests passed (run once, by the backend engineer).
+- `curl -X POST http://127.0.0.1:3140/api/demo/run` with a same-origin `Origin` header returned `200` with `{ off, on }`; without the header, `403`. `POST /api/breaker/demo` with `{"scenario":"A"}` returned `200` with `{ off, on }`.
+
+## Demo data is deleted on every run
+
+- **Run live demo** (Overview) calls `POST /api/demo/run`. It truncates `tb_events`, `tb_approvals`, `tb_sessions`, `tb_contexts` and `support_tickets` in the dashboard database, deletes the scripted runs older than 4 seconds from the Breaker log, then writes two new contexts.
+- **Run scenario** (SQL Breaker tab) calls `POST /api/breaker/demo`. It deletes the scripted runs older than 4 seconds from the Breaker log, then runs the scenario in both modes.
+- Neither needs the operator sign-in. Neither touches Breaker sessions opened through the HTTP API on 3150 or the MCP server.
+- `core/test/demo.test.ts` calls the same code, so `npm run test:core` also clears the dashboard's demo history. Do not run it during a presentation.

@@ -50,14 +50,21 @@ function Stamps({ when, flags }: { when: string; flags: BreakerEvent["flags_befo
 }
 
 /** Memoized: a refresh that brings nothing new hands over the same array and leaves every row alone. */
-export const DecisionLog = memo(function DecisionLog({ events }: { events: BreakerEvent[] }) {
+export const DecisionLog = memo(function DecisionLog({
+  events,
+  waiting = false,
+}: {
+  events: BreakerEvent[];
+  /** A run is still playing: the log is empty on purpose, and there is nothing to ask the reader for. */
+  waiting?: boolean;
+}) {
   const still = useReducedMotion();
   const [all, setAll] = useState(false);
   const shown = all ? events : events.slice(0, FOLD);
 
   return (
     <>
-      {events.length === 0 && <Empty>No decisions yet. Run a scenario above.</Empty>}
+      {events.length === 0 && !waiting && <Empty>No decisions yet. Run a scenario above.</Empty>}
       {/* The list stays mounted while empty, so the first decision of a run slides in like every later one. */}
       <ol id="breaker-decision-log" className={events.length ? "space-y-2" : undefined}>
         <AnimatePresence initial={false}>

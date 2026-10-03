@@ -1,0 +1,288 @@
+.panel {
+  margin-top: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+/* ---------- control bar ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.breaker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.breakerLabel {
+  display: grid;
+  gap: 1px;
+}
+
+.breakerLabel b {
+  font-size: 14px;
+}
+
+.breakerLabel span {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* toggle switch */
+.toggle {
+  position: relative;
+  width: 112px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  transition: background 0.15s ease;
+  padding: 0 14px;
+  text-align: left;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fff;
+  transform: translateY(-50%);
+  transition: left 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.toggle.on {
+  background: var(--ok);
+  text-align: left;
+}
+
+.toggle.on::after {
+  left: 80px;
+}
+
+.toggle.off {
+  background: var(--danger);
+  text-align: right;
+}
+
+.toggle.off::after {
+  left: 4px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.resetMsg {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------- log ---------- */
+.logCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.logHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logHead h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.runpill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.empty {
+  color: var(--faint);
+  font-size: 14px;
+  margin: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.header.on {
+  background: var(--ok-soft);
+  color: #11662e;
+}
+
+.header.off {
+  background: var(--danger-soft);
+  color: #a31b1b;
+}
+
+.header code {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.narration {
+  display: flex;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--muted);
+  padding: 0 2px;
+}
+
+.narration b {
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fbfcfe;
+}
+
+.stepLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin-bottom: 7px;
+}
+
+.sql,
+.rows {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0f1420;
+  color: #d7e0f0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+.rows {
+  margin-top: 8px;
+  background: #f3f5f9;
+  color: #2a3140;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13.5px;
+}
+
+.badge {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 6px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.allow {
+  background: var(--ok);
+}
+
+.deny {
+  background: var(--danger);
+}
+
+.running {
+  font-size: 12.5px;
+  color: var(--faint);
+  margin-top: 6px;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.done {
+  font-size: 13px;
+  color: var(--faint);
+  padding: 2px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
