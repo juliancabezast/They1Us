@@ -1,69 +1,189 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useCallback, useEffect, useState } from "react";
+import { Icon, button } from "@/components/ui";
+import { AttackLab } from "@/components/views/AttackLab";
+import { AuditLog } from "@/components/views/AuditLog";
+import { Overview } from "@/components/views/Overview";
+import { Policies } from "@/components/views/Policies";
+import { Sessions } from "@/components/views/Sessions";
+import { supabase } from "@/lib/supabase-browser";
+import type { DashboardState } from "@/lib/types";
+
+const VIEWS = [
+  ["overview", "Overview"],
+  ["attack-lab", "Attack Lab"],
+  ["sessions", "Sessions"],
+  ["policies", "Policies"],
+  ["audit-log", "Audit Log"],
+] as const;
+type View = (typeof VIEWS)[number][0];
+
+const post = (path: string, body: object = {}, method = "POST") =>
+  fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+export default function Dashboard() {
+  const [state, setState] = useState<DashboardState | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [view, setView] = useState<View>("overview");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/state", { cache: "no-store" });
+      if (!res.ok) throw new Error(`The backend answered ${res.status}`);
+      setState(await res.json());
+      setLoadError(null);
+    } catch (err) {
+      setLoadError((err as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    const fromHash = () => {
+      const hash = window.location.hash.slice(1);
+      if (VIEWS.some(([id]) => id === hash)) setView(hash as View);
+    };
+    const first = setTimeout(() => {
+      fromHash();
+      refresh();
+    }, 0);
+    window.addEventListener("hashchange", fromHash);
+    // Realtime drives updates; the slow poll only covers a dropped socket.
+    // The list is always replaced from the server, so a reconnect cannot duplicate events.
+    const poll = setInterval(refresh, 6000);
+    const channel = supabase
+      .channel("breaker")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "tb_events" }, refresh)
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+    return () => {
+      clearTimeout(first);
+      window.removeEventListener("hashchange", fromHash);
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
+  }, [refresh]);
+
+  const act = async (name: string, requests: () => Promise<Response[]>) => {
+    setBusy(name);
+    setError(null);
+    try {
+      for (const res of await requests()) {
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `Request failed (${res.status})`);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+      refresh();
+    }
+  };
+
+  const go = (id: View) => {
+    setView(id);
+    window.history.replaceState(null, "", `#${id}`);
+  };
+
+  const props = {
+    live,
+    busy,
+    onDecide: (id: string, action: "approve" | "reject") => act("approval", async () => [await post(`/api/approvals/${id}`, { action })]),
+    onRunAttack: () => act("attack", () => Promise.all([post("/api/sandbox/attack"), post("/api/runs/attack")])),
+    onRunWorkflow: () => act("workflow", async () => [await post("/api/runs/workflow")]),
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-6 sm:px-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+            <Icon name="shield" className="h-5 w-5 text-allow" />
+            Trifecta Breaker
+            <span className="font-normal text-muted">Agent access, without blind trust.</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          <p className="mt-1 text-sm text-muted">Enforce data-access boundaries, control sensitive actions, and explain every decision.</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="flex items-center gap-1.5 text-xs text-muted">
+            <span className={`h-2 w-2 rounded-full ${live ? "bg-allow" : "bg-muted"}`} />
+            {live ? "Realtime connected" : "Realtime connecting"}
+          </span>
+          {state?.operator ? (
+            <>
+              <button type="button" disabled={busy !== null} onClick={() => act("reset", async () => [await post("/api/reset")])} className={button.quiet}>
+                Clear history
+              </button>
+              <button type="button" onClick={() => act("signout", async () => [await post("/api/operator", {}, "DELETE")])} className={button.secondary}>
+                Operator · sign out
+              </button>
+            </>
+          ) : signingIn ? (
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const passcode = new FormData(e.currentTarget).get("passcode");
+                act("signin", async () => [await post("/api/operator", { passcode })]).then(() => setSigningIn(false));
+              }}
+            >
+              <label className="sr-only" htmlFor="passcode">Operator passcode</label>
+              <input id="passcode" name="passcode" type="password" autoFocus placeholder="Operator passcode" className="w-44 rounded-lg border border-line bg-raised px-3 py-2 text-sm" />
+              <button type="submit" className={button.primary}>Sign in</button>
+            </form>
+          ) : (
+            <button type="button" onClick={() => setSigningIn(true)} className={button.secondary}>
+              Operator sign-in
+            </button>
+          )}
         </div>
-      </main>
-    </div>
+      </header>
+
+      <nav aria-label="Views" className="mt-5 flex gap-1 overflow-x-auto border-b border-line">
+        {VIEWS.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => go(id)}
+            aria-current={view === id ? "page" : undefined}
+            className={`-mb-px shrink-0 border-b-2 px-3.5 py-2.5 text-sm font-medium ${
+              view === id ? "border-text text-text" : "border-transparent text-muted hover:text-text"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {error && (
+        <p role="alert" className="mt-4 flex items-center gap-2 rounded-lg border border-deny/40 bg-deny/10 px-3 py-2 text-sm text-deny">
+          <Icon name="alert" /> {error}
+        </p>
+      )}
+
+      <div className="mt-5">
+        {!state ? (
+          loadError ? (
+            <p role="alert" className="rounded-lg border border-deny/40 bg-deny/10 px-3 py-6 text-center text-sm text-deny">
+              Could not load the dashboard: {loadError}
+            </p>
+          ) : (
+            <p className="py-16 text-center text-sm text-muted">Loading state from the backend</p>
+          )
+        ) : view === "overview" ? (
+          <Overview state={state} {...props} />
+        ) : view === "attack-lab" ? (
+          <AttackLab state={state} {...props} />
+        ) : view === "sessions" ? (
+          <Sessions state={state} {...props} />
+        ) : view === "policies" ? (
+          <Policies state={state} {...props} />
+        ) : (
+          <AuditLog state={state} {...props} />
+        )}
+      </div>
+    </main>
   );
 }
