@@ -10,11 +10,13 @@ import { AuditLog } from "@/components/views/AuditLog";
 import { Overview } from "@/components/views/Overview";
 import { Policies } from "@/components/views/Policies";
 import { Sessions } from "@/components/views/Sessions";
+import { SqlBreaker } from "@/components/views/SqlBreaker";
 import { supabase } from "@/lib/supabase-browser";
 import type { DashboardState } from "@/lib/types";
 
 const VIEWS = [
   ["overview", "Overview"],
+  ["sql-breaker", "SQL Breaker"],
   ["attack-lab", "Attack Lab"],
   ["sessions", "Sessions"],
   ["policies", "Policies"],
@@ -266,6 +268,8 @@ export default function Dashboard() {
               >
                 {view === "overview" ? (
                   <Overview state={state} {...props} />
+                ) : view === "sql-breaker" ? (
+                  <SqlBreaker />
                 ) : view === "attack-lab" ? (
                   <AttackLab state={state} {...props} />
                 ) : view === "sessions" ? (

@@ -8,7 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --env-file=.env.local --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:core": "vitest run",
+    "core:db": "tsx --env-file=.env.local core/sql/apply.ts breaker 001_schema.sql 002_labels.sql && tsx --env-file=.env.local core/sql/apply.ts customer 001_schema.sql 002_seed.sql",
+    "core:reset": "tsx --env-file=.env.local core/sql/apply.ts breaker 003_reset.sql && tsx --env-file=.env.local core/sql/apply.ts customer 003_reset.sql",
+    "replay": "tsx --env-file=.env.local core/src/replay.ts",
+    "mcp": "tsx core/src/mcp.ts",
+    "breaker": "tsx --env-file=.env.local core/src/server.ts",
+    "attack": "npm run -s core:reset && npm run -s replay -- A --unprotected && npm run -s replay -- A --protected"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -19,8 +26,9 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^24.19.1",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -28,6 +36,8 @@
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3",
+    "zod": "^4.6.5"
   }
 }
