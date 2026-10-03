@@ -56,7 +56,7 @@ Variables in `.env.local` (never commit values):
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | Postgres connection (Supabase session pooler). Server only. |
+| `DATABASE_URL` | Postgres connection (Supabase transaction pooler, port 6543). Server only. |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable key, used by the browser only for the Realtime subscription to `tb_events`. |
 | `OPERATOR_PASSCODE` | What the operator types to sign in. |
 | `SESSION_SECRET` | Signs the operator cookie. |
