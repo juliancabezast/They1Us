@@ -1,51 +1,104 @@
 @import "tailwindcss";
 
+/* Dark theme: Supabase's palette. Light theme: Stripe's. */
+:root {
+  --ink: #121212;
+  --panel: #171717;
+  --raised: #1f1f1f;
+  --line: #2e2e2e;
+  --muted: #a0a0a0;
+  --text: #ededed;
+  --brand: #635bff; /* Stripe blurple */
+  --on-brand: #ffffff;
+  --allow: #3ecf8e; /* Supabase green */
+  --deny: #ff6166;
+  --hold: #f5a524;
+  --untrusted: #f0a35e;
+  --secret: #00d4ff; /* Stripe cyan */
+}
+
+:root[data-theme="light"] {
+  --ink: #f6f9fc;
+  --panel: #ffffff;
+  --raised: #f6f9fc;
+  --line: #e3e8ee;
+  --muted: #425466;
+  --text: #0a2540;
+  --brand: #635bff;
+  --on-brand: #ffffff;
+  --allow: #0b8a5c;
+  --deny: #df1b41;
+  --hold: #b45f06;
+  --untrusted: #c84801;
+  --secret: #0570de;
+}
+
 @theme inline {
   --font-sans: Circular, var(--font-brand-sans), "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-brand-mono), "Source Code Pro", Menlo, monospace;
-  --color-ink: #0b0d10;
-  --color-panel: #12151a;
-  --color-raised: #191d24;
-  --color-line: #262b34;
-  --color-muted: #8b94a3;
-  --color-text: #e8ebf0;
-  --color-allow: #3ecf8e;
-  --color-deny: #ff5d5d;
-  --color-hold: #f5a524;
-  --color-untrusted: #e0a35a;
-  --color-secret: #a78bfa;
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-text: var(--text);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-allow: var(--allow);
+  --color-deny: var(--deny);
+  --color-hold: var(--hold);
+  --color-untrusted: var(--untrusted);
+  --color-secret: var(--secret);
 }
 
 body {
   background: var(--color-ink);
   color: var(--color-text);
+  transition: background-color 0.2s, color 0.2s;
   font-family: var(--font-sans);
 }
 
-@keyframes event-in {
-  from {
-    transform: translateY(-6px);
-  }
-  to {
-    transform: none;
-  }
-}
-
-.event-in {
-  animation: event-in 0.35s ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .event-in {
-    animation: none;
-  }
-}
-
 :focus-visible {
-  outline: 2px solid var(--color-text);
+  outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
 
+/* The demo takes the whole stage: everything behind it goes dark and soft. */
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.65);
+  background: rgb(0 0 0 / 0.82);
+  backdrop-filter: blur(6px);
+}
+
+/* Live demo tour: movement is driven by Motion; only these two stay in CSS. */
+@keyframes ring {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+@keyframes sweep {
+  from {
+    background-size: 0% 100%;
+  }
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+.tour-ring {
+  animation: ring 1.4s ease-out infinite;
+}
+.tour-sweep {
+  background-image: linear-gradient(color-mix(in srgb, var(--color-deny) 22%, transparent), color-mix(in srgb, var(--color-deny) 22%, transparent));
+  background-repeat: no-repeat;
+  animation: sweep 0.8s 0.35s cubic-bezier(0.6, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring,
+  .tour-sweep {
+    animation: none;
+  }
 }

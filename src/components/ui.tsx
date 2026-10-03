@@ -7,6 +7,8 @@ const PATHS = {
   alert: "M12 8v5M12 16.5v.5M10.3 3.9L2.6 17.5A2 2 0 004.3 20.5h15.4a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z",
   unlock: "M8 11V7a4 4 0 017.5-2M6 11h12v9H6z",
   shield: "M12 3l7 3v5.5c0 4.3-2.9 8-7 9.5-4.1-1.5-7-5.2-7-9.5V6l7-3z",
+  sun: "M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6L4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 8a4 4 0 100 8 4 4 0 000-8z",
+  moon: "M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z",
 } as const;
 
 export function Icon({ name, className = "h-3.5 w-3.5" }: { name: keyof typeof PATHS; className?: string }) {
@@ -24,7 +26,7 @@ const DECISIONS: Record<Decision, { text: string; icon: keyof typeof PATHS; tone
   REJECTED: { text: "Rejected", icon: "x", tone: "border-deny/50 bg-deny/10 text-deny" },
   APPROVAL_REQUIRED: { text: "Approval required", icon: "clock", tone: "border-hold/50 bg-hold/10 text-hold" },
   EXECUTION_FAILED: { text: "Execution failed", icon: "alert", tone: "border-hold/50 bg-hold/10 text-hold" },
-  UNCHECKED: { text: "Unchecked", icon: "unlock", tone: "border-line bg-white/5 text-muted" },
+  UNCHECKED: { text: "Unchecked", icon: "unlock", tone: "border-line bg-text/5 text-muted" },
 };
 
 export function DecisionBadge({ decision }: { decision: Decision }) {
@@ -44,7 +46,7 @@ export function Chip({ tone = "neutral", children }: { tone?: "untrusted" | "sec
     allow: "bg-allow/15 text-allow",
     deny: "bg-deny/15 text-deny",
     hold: "bg-hold/15 text-hold",
-    neutral: "bg-white/5 text-muted",
+    neutral: "bg-text/5 text-muted",
   };
   return <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium ${tones[tone]}`}>{children}</span>;
 }
@@ -66,7 +68,7 @@ export const Empty = ({ children }: { children: React.ReactNode }) => (
 );
 
 export const button = {
-  primary: "rounded-lg bg-text px-3.5 py-2 text-sm font-semibold text-ink disabled:opacity-40",
+  primary: "rounded-lg bg-brand px-3.5 py-2 text-sm font-semibold text-on-brand transition-transform hover:brightness-110 active:scale-[0.97] disabled:opacity-40",
   secondary: "rounded-lg border border-line bg-raised px-3.5 py-2 text-sm font-medium hover:border-muted disabled:opacity-40",
   quiet: "rounded-lg px-3 py-2 text-sm text-muted hover:text-text disabled:opacity-40",
 };
