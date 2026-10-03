@@ -8,6 +8,7 @@ import { Icon } from "../ui";
 export type HopState = "idle" | "open" | "denied" | "held";
 type Point = [number, number];
 type Curve = [Point, Point, Point, Point];
+type NodeId = "ticket" | "agent" | "vault" | "out";
 
 // Layout in percentages of the stage; converted to pixels once the stage is measured.
 const NODES = { ticket: [13, 50], agent: [48, 50], vault: [86, 22], out: [86, 78] } satisfies Record<string, Point>;
@@ -80,8 +81,17 @@ function Gate({ at, state }: { at: Point; state: "denied" | "held" }) {
       initial={{ scale: 0, rotate: -40 }}
       animate={{ scale: 1, rotate: 0 }}
       transition={{ ...bouncy, delay }}
-      style={{ left: at[0], top: at[1], color, borderColor: color }}
-      className="absolute -ml-4 -mt-4 flex h-8 w-8 items-center justify-center rounded-full border-2 bg-ink"
+      // Glass: a frosted disc over the curves, tinted by the gate's own colour.
+      style={{
+        left: at[0],
+        top: at[1],
+        color,
+        borderColor: color,
+        background: `color-mix(in srgb, var(--ink) 55%, transparent)`,
+        boxShadow: `0 6px 20px -6px color-mix(in srgb, ${color} 55%, transparent)`,
+        zIndex: 25,
+      }}
+      className="absolute -ml-4 -mt-4 flex h-8 w-8 items-center justify-center rounded-full border-2 backdrop-blur-sm"
     >
       <motion.span
         initial={{ scale: 1, opacity: 0.6 }}
@@ -101,9 +111,11 @@ function Node({
   title,
   sub,
   color,
-  pulse,
+  focused,
+  dimmed,
   shake,
   dashed,
+  still,
   children,
 }: {
   at: Point;
@@ -111,18 +123,39 @@ function Node({
   title: string;
   sub: string;
   color: string;
-  pulse: boolean;
+  /** The step on screen is about this node: it zooms in and lifts above the rest. */
+  focused: boolean;
+  /** Another node is the focus, so this one steps back. */
+  dimmed: boolean;
   shake?: boolean;
   dashed?: boolean;
+  still: boolean;
   children?: React.ReactNode;
 }) {
+  const scale = focused ? 1.13 : dimmed ? 0.95 : 1;
   return (
     <motion.div
-      // Reacts when it is the node something just arrived at (or failed to).
-      animate={shake ? { x: [0, -7, 7, -5, 5, -2, 0], scale: 1 } : { x: 0, scale: pulse ? [1, 1.06, 1] : 1 }}
-      transition={{ duration: 0.5, delay: 0.9, ease: "easeOut" }}
-      style={{ left: at[0] - width / 2, top: at[1], y: "-50%", borderColor: color, width }}
-      className={`absolute rounded-xl border bg-raised px-2 py-2 text-center shadow-lg shadow-black/10 transition-[border-color] duration-500 ${
+      // The active node zooms like a camera settling on it; a leak gives the final node a shake first.
+      animate={shake && !still ? { x: [0, -7, 7, -5, 5, -2, 0], scale, opacity: 1 } : { x: 0, scale, opacity: dimmed ? 0.55 : 1 }}
+      transition={
+        still
+          ? { duration: 0 }
+          : { scale: { type: "spring", stiffness: 300, damping: 19 }, opacity: { duration: 0.4 }, x: { duration: 0.5, ease: "easeOut" } }
+      }
+      style={{
+        left: at[0] - width / 2,
+        top: at[1],
+        y: "-50%",
+        width,
+        borderColor: color,
+        zIndex: focused ? 20 : dimmed ? 1 : 10,
+        // Glass: a translucent card over the stage, frosted so the curves blur through it.
+        background: `color-mix(in srgb, var(--raised) ${focused ? 82 : 66}%, transparent)`,
+        boxShadow: focused
+          ? `0 16px 40px -10px color-mix(in srgb, ${color} 60%, transparent), 0 2px 10px rgba(0, 0, 0, 0.18)`
+          : "0 4px 16px rgba(0, 0, 0, 0.12)",
+      }}
+      className={`absolute rounded-xl border px-2 py-2 text-center backdrop-blur-md transition-[border-color] duration-500 ${
         dashed ? "border-dashed" : ""
       }`}
     >
@@ -164,7 +197,7 @@ export interface StageProps {
 export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const still = useReducedMotion();
+  const still = !!useReducedMotion();
 
   useEffect(() => {
     const el = ref.current;
@@ -182,8 +215,14 @@ export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps
   const last = hops.findLastIndex((h) => h !== "idle");
   const tainted = hops[0] !== "idle";
 
+  // The node the current step is about. It zooms in; the others step back, so the eye follows the action.
+  const focus: NodeId | null = !submitted ? null : last < 0 ? "ticket" : last === 0 ? "agent" : last === 1 ? "vault" : "out";
+  const node = (id: NodeId) => ({ focused: focus === id, dimmed: focus !== null && focus !== id, still });
+
   return (
     <div ref={ref} className="relative h-60 overflow-hidden rounded-xl border border-line bg-ink sm:h-72">
+      {/* A faint top sheen, so the frosted cards read as glass sitting on a surface. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent" />
       {size.w > 0 && (
         <>
           <svg width={size.w} height={size.h} className="absolute inset-0" aria-hidden="true">
@@ -230,7 +269,7 @@ export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps
             sub={submitted ? "written by a stranger" : "not filed yet"}
             color={submitted ? "var(--untrusted)" : "var(--line)"}
             dashed={!submitted}
-            pulse={submitted && last < 0}
+            {...node("ticket")}
           >
             {submitted && <Tag key="u" color="var(--untrusted)">untrusted</Tag>}
           </Node>
@@ -240,7 +279,7 @@ export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps
             title="Agent context"
             sub="what the agent holds"
             color={tainted ? "var(--untrusted)" : "var(--line)"}
-            pulse={last === 0}
+            {...node("agent")}
           >
             {tainted && <Tag key="u" color="var(--untrusted)">untrusted</Tag>}
             {hops[1] === "open" && <Tag key="s" color="var(--secret)">secret</Tag>}
@@ -251,7 +290,7 @@ export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps
             title="Integration token"
             sub="integration_tokens"
             color={hops[1] === "denied" ? "var(--allow)" : "var(--secret)"}
-            pulse={last === 1}
+            {...node("vault")}
           >
             {hops[1] === "denied" ? (
               <Tag key="safe" color="var(--allow)">not reached</Tag>
@@ -265,8 +304,8 @@ export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps
             title="Attacker's screen"
             sub="reply on their ticket"
             color={leaked ? "var(--deny)" : contained ? "var(--allow)" : "var(--line)"}
-            pulse={last === 2}
             shake={leaked && !still}
+            {...node("out")}
           >
             {leaked && <Tag key="leak" color="var(--deny)">token leaked</Tag>}
             {contained && <Tag key="empty" color="var(--allow)">nothing arrived</Tag>}
