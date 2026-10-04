@@ -52,9 +52,9 @@ function Packet({ curve, state, color }: { curve: Curve; state: HopState; color:
         await animate(t, 0.16, { type: "spring", stiffness: 200, damping: 13 });
         if (!cancelled) animate(opacity, 0, { duration: 0.4 });
       } else {
-        // Held: eases to a stop in front of the gate and waits there.
-        await animate(t, 0.42, { duration: 0.9, ease: [0.1, 0.7, 0.2, 1] });
-        if (!cancelled) animate(scale, [1, 1.25, 1], { duration: 1.6, repeat: Infinity, ease: "easeInOut" });
+        // Held: eases to a stop just before the gate, then fades so the clock gate stands alone.
+        await animate(t, 0.4, { duration: 0.8, ease: [0.1, 0.7, 0.2, 1] });
+        if (!cancelled) animate(opacity, 0, { duration: 0.45 });
       }
     };
     run();
@@ -66,7 +66,7 @@ function Packet({ curve, state, color }: { curve: Curve; state: HopState; color:
   return (
     <motion.span
       aria-hidden="true"
-      style={{ x, y, opacity, scale, background: color, boxShadow: `0 0 18px 2px ${color}` }}
+      style={{ x, y, opacity, scale, background: color, boxShadow: `0 0 ${state === "open" ? "18px 2px" : "9px 1px"} ${color}` }}
       className="absolute left-0 top-0 -ml-1.5 -mt-1.5 h-3 w-3 rounded-full"
     />
   );
@@ -79,7 +79,7 @@ function Gate({ at, state }: { at: Point; state: "denied" | "held" }) {
     <motion.span
       aria-hidden="true"
       initial={{ scale: 0, rotate: -40 }}
-      animate={{ scale: 1, rotate: 0 }}
+      animate={{ scale: 1.08, rotate: 0 }}
       transition={{ ...bouncy, delay }}
       // Glass: a frosted disc over the curves, tinted by the gate's own colour.
       style={{
@@ -132,11 +132,11 @@ function Node({
   still: boolean;
   children?: React.ReactNode;
 }) {
-  const scale = focused ? 1.13 : dimmed ? 0.95 : 1;
+  const scale = focused ? 1.16 : dimmed ? 0.92 : 1;
   return (
     <motion.div
       // The active node zooms like a camera settling on it; a leak gives the final node a shake first.
-      animate={shake && !still ? { x: [0, -7, 7, -5, 5, -2, 0], scale, opacity: 1 } : { x: 0, scale, opacity: dimmed ? 0.55 : 1 }}
+      animate={shake && !still ? { x: [0, -7, 7, -5, 5, -2, 0], scale, opacity: 1 } : { x: 0, scale, opacity: dimmed ? 0.5 : 1 }}
       transition={
         still
           ? { duration: 0 }
@@ -258,7 +258,14 @@ export function Stage({ runKey, hops, submitted, leaked, contained }: StageProps
           {!still &&
             hops.map(
               (h, i) =>
-                h !== "idle" && <Packet key={`${runKey}-${i}`} curve={travel(i)} state={h} color={h === "open" ? TONES[i] : "var(--muted)"} />,
+                h !== "idle" && (
+                  <Packet
+                    key={`${runKey}-${i}`}
+                    curve={travel(i)}
+                    state={h}
+                    color={h === "open" ? TONES[i] : h === "denied" ? "var(--deny)" : "var(--hold)"}
+                  />
+                ),
             )}
           {hops.map((h, i) => (h === "denied" || h === "held") && <Gate key={`${runKey}-gate-${i}`} at={bezier(curves[i], 0.5)} state={h} />)}
 

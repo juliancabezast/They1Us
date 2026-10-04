@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import s from "./admin.module.css";
 
 // Mirror of AgentEvent in src/lib/victim/agent.ts (that file is server-only, so it is not imported here).
@@ -38,6 +38,25 @@ export default function AdminConsole({ liveAvailable }: { liveAvailable: boolean
   const [running, setRunning] = useState(false);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [resetMsg, setResetMsg] = useState("");
+
+  // Keep the toggle across a remount (navigating to a ticket and back, or a hot reload while developing),
+  // so it never silently flips to OFF. Read once on mount; written in the handlers below.
+  useEffect(() => {
+    // Deferred so the restore runs after hydration, not synchronously in the effect body.
+    const t = setTimeout(() => {
+      try {
+        const on = localStorage.getItem("victim-breaker-on");
+        if (on !== null) setBreakerOn(on === "1");
+        if (liveAvailable) {
+          const sc = localStorage.getItem("victim-scripted");
+          if (sc !== null) setScripted(sc === "1");
+        }
+      } catch {
+        // No storage (private window, blocked): the defaults stand.
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [liveAvailable]);
 
   const push = (e: AgentEvent) => setEvents((prev) => [...prev, e]);
   const pushLine = (line: string) => {
@@ -110,7 +129,13 @@ export default function AdminConsole({ liveAvailable }: { liveAvailable: boolean
             role="switch"
             aria-checked={breakerOn}
             className={`${s.toggle} ${breakerOn ? s.on : s.off}`}
-            onClick={() => setBreakerOn((v) => !v)}
+            onClick={() => {
+              const next = !breakerOn;
+              setBreakerOn(next);
+              try {
+                localStorage.setItem("victim-breaker-on", next ? "1" : "0");
+              } catch {}
+            }}
             disabled={running}
           >
             {breakerOn ? "ON" : "OFF"}
@@ -125,7 +150,12 @@ export default function AdminConsole({ liveAvailable }: { liveAvailable: boolean
           <input
             type="checkbox"
             checked={scripted}
-            onChange={(e) => setScripted(e.target.checked)}
+            onChange={(e) => {
+              setScripted(e.target.checked);
+              try {
+                localStorage.setItem("victim-scripted", e.target.checked ? "1" : "0");
+              } catch {}
+            }}
             disabled={running || !liveAvailable}
           />
           Scripted AI (deterministic fallback)

@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BreakerEvent, BreakerState } from "@core/scenarios";
 import { Stage, type HopState } from "@/components/tour/Stage";
 import { softSpring } from "@/components/motion";
-import { Chip, Empty, Icon, time } from "@/components/ui";
+import { Chip, Empty, Icon, button, time } from "@/components/ui";
 
 // The same picture as the Live demo, but driven by what the Breaker service actually did:
 // every row below is a real decision from breaker.events, written by the Victim app (Agent console
-// with the Breaker on), the SQL Breaker tab, the HTTP API or the MCP server.
+// with the Breaker on), the SQL Breaker tab, the HTTP API or the MCP server. The newest process plays
+// through the diagram one step at a time, and "Rewatch" plays it again.
 
 const POLL_MS = 3000;
+const STEP_MS = 1800;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isEvent = (v: unknown): v is BreakerEvent => isObject(v) && typeof v.sql === "string" && typeof v.session_id === "string";
@@ -29,9 +31,10 @@ async function fetchState(signal: AbortSignal): Promise<BreakerState> {
 
 // Which part of the flow a single decision is about, so each real event lands on the right hop of the diagram.
 type Kind = "ticket" | "token" | "write";
+const KIND_INDEX: Record<Kind, number> = { ticket: 0, token: 1, write: 2 };
 const touches = (e: BreakerEvent, name: string) => e.relations?.some((r) => r.name === name) || new RegExp(name).test(e.sql);
 const kindOf = (e: BreakerEvent): Kind => (e.is_write ? "write" : touches(e, "integration_tokens") ? "token" : "ticket");
-const hopState = (e?: BreakerEvent): HopState => (!e ? "idle" : e.decision === "allow" ? "open" : "denied");
+const hopState = (e: BreakerEvent): HopState => (e.decision === "allow" ? "open" : "denied");
 
 const STEP_LABEL: Record<Kind, string> = {
   ticket: "Read the support tickets",
@@ -39,14 +42,22 @@ const STEP_LABEL: Record<Kind, string> = {
   write: "Write the reply on the ticket",
 };
 
-/** Turns one session's real events into the diagram's inputs and an ordered, readable step list. */
-function derive(events: BreakerEvent[]) {
-  const asc = [...events].sort((a, b) => a.id - b.id);
-  const first = (k: Kind) => asc.find((e) => kindOf(e) === k);
-  const hops: HopState[] = [hopState(first("ticket")), hopState(first("token")), hopState(first("write"))];
-  const leaked = hops[1] === "open" && hops[2] === "open";
-  const contained = !leaked && (hops[1] === "denied" || hops[2] === "denied");
-  return { asc, hops, submitted: asc.length > 0, leaked, contained };
+interface Step {
+  index: number;
+  state: HopState;
+  event: BreakerEvent;
+}
+
+/** One session's real events in the order they happened, each mapped to a hop of the diagram. */
+function sequence(events: BreakerEvent[]): Step[] {
+  return [...events].sort((a, b) => a.id - b.id).map((event) => ({ index: KIND_INDEX[kindOf(event)], state: hopState(event), event }));
+}
+
+/** The diagram's three hops, with only the first `shown` steps of the sequence revealed. */
+function hopsOf(seq: Step[], shown: number): HopState[] {
+  const hops: HopState[] = ["idle", "idle", "idle"];
+  for (let k = 0; k < shown && k < seq.length; k++) hops[seq[k].index] = seq[k].state;
+  return hops;
 }
 
 interface Loaded {
@@ -88,9 +99,13 @@ function Decision({ n, event }: { n: number; event: BreakerEvent }) {
   );
 }
 
-/** The real Breaker service, drawn in the same structure as the Live demo. */
+/** The real Breaker service, drawn and replayed in the same structure as the Live demo. */
 export function LiveService() {
   const [loaded, setLoaded] = useState<Loaded>({ data: null, at: null, error: null });
+  // A playback of one session: `id` forces the diagram to re-animate; `revealed` is how many steps are on screen.
+  const [replay, setReplay] = useState<{ id: number; revealed: number } | null>(null);
+  const playSeq = useRef(0);
+  const lastKey = useRef<string | null>(null);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -107,7 +122,6 @@ export function LiveService() {
           timer = setTimeout(tick, POLL_MS);
         },
         (err: unknown) => {
-          // A failed poll keeps the last picture on screen: it was still a real moment.
           if (!request!.signal.aborted)
             setLoaded((last) => ({ ...last, error: err instanceof Error ? err.message : "The service could not be read." }));
           timer = setTimeout(tick, POLL_MS);
@@ -125,9 +139,40 @@ export function LiveService() {
   // The session the newest decision belongs to: the one that is happening, or just happened.
   const latestSession = data?.events[0]?.session_id ?? null;
   const sessionRow = data?.sessions.find((s) => s.id === latestSession) ?? null;
-  const events = latestSession ? (data?.events.filter((e) => e.session_id === latestSession) ?? []) : [];
-  const { asc, hops, submitted, leaked, contained } = derive(events);
-  const newestId = asc.length ? asc[asc.length - 1].id : 0;
+  const seq = latestSession ? sequence(data!.events.filter((e) => e.session_id === latestSession)) : [];
+  const newestId = seq.length ? seq[seq.length - 1].event.id : 0;
+  const sessionKey = latestSession ? `${latestSession}:${newestId}:${seq.length}` : null;
+
+  // A newly seen process plays itself: reset the reveal to the start whenever the latest session changes.
+  useEffect(() => {
+    if (!sessionKey || sessionKey === lastKey.current) return;
+    const t = setTimeout(() => {
+      lastKey.current = sessionKey;
+      playSeq.current += 1;
+      setReplay({ id: playSeq.current, revealed: 0 });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [sessionKey]);
+
+  // Reveal one step at a time while a playback is running.
+  useEffect(() => {
+    if (!replay || replay.revealed >= seq.length) return;
+    const t = setTimeout(() => setReplay((r) => (r ? { ...r, revealed: r.revealed + 1 } : r)), replay.revealed === 0 ? 300 : STEP_MS);
+    return () => clearTimeout(t);
+  }, [replay, seq.length]);
+
+  const rewatch = () => {
+    playSeq.current += 1;
+    setReplay({ id: playSeq.current, revealed: 0 });
+  };
+
+  // Not playing back: show the whole session at rest. Playing: show only what has been revealed.
+  const revealed = replay ? Math.min(replay.revealed, seq.length) : seq.length;
+  const playing = replay !== null && replay.revealed < seq.length;
+  const hops = hopsOf(seq, revealed);
+  const leaked = hops[1] === "open" && hops[2] === "open";
+  const contained = !leaked && (hops[1] === "denied" || hops[2] === "denied");
+  const shownEvents = seq.slice(0, revealed).map((s) => s.event);
 
   return (
     <div className="space-y-5">
@@ -139,7 +184,7 @@ export function LiveService() {
             <Link href="/victim/admin" className="text-brand underline hover:brightness-110">
               Victim app
             </Link>{" "}
-            with the Breaker on, from the SQL Breaker tab, or over the HTTP API, and it appears within a few seconds.
+            with the Breaker on, from the SQL Breaker tab, or over the HTTP API, and it plays here within a few seconds.
           </p>
         </div>
         {data && (
@@ -156,50 +201,57 @@ export function LiveService() {
         {error ?? (at ? `Live. Updated at ${time(at)}.` : "Reading the service.")}
       </p>
 
-      {submitted ? (
+      {seq.length > 0 ? (
         <>
           <div className="grid gap-5 lg:grid-cols-2">
             <div className="space-y-2">
-              <p className="text-xs text-muted">
-                Session <code className="font-mono text-text">{latestSession}</code>
-                {sessionRow?.label && <> · {sessionRow.label}</>}
-              </p>
-              <Stage runKey={`${latestSession}:${newestId}`} hops={hops} submitted={submitted} leaked={leaked} contained={contained} />
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <p className="min-w-0 text-xs text-muted">
+                  Session <code className="font-mono text-text">{latestSession}</code>
+                  {sessionRow?.label && <> · {sessionRow.label}</>}
+                </p>
+                <button type="button" onClick={rewatch} disabled={playing} className={`${button.secondary} px-3 py-1.5 text-xs`}>
+                  {playing ? `Replaying ${revealed}/${seq.length}` : "Rewatch"}
+                </button>
+              </div>
+              <Stage runKey={`${latestSession}:${newestId}:${replay?.id ?? 0}`} hops={hops} submitted leaked={leaked} contained={contained} />
             </div>
 
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Decisions on this session</p>
               <ol className="space-y-1.5">
-                {asc.map((e, i) => (
+                {shownEvents.map((e, i) => (
                   <Decision key={e.id} n={i + 1} event={e} />
                 ))}
               </ol>
             </div>
           </div>
 
-          <p
-            className={`flex items-start gap-2 rounded-xl border bg-panel px-4 py-3 text-sm leading-snug ${
-              leaked ? "border-deny/50" : contained ? "border-allow/40" : "border-line"
-            }`}
-          >
-            <Icon
-              name={leaked ? "alert" : "shield"}
-              className={`mt-0.5 h-4 w-4 shrink-0 ${leaked ? "text-deny" : contained ? "text-allow" : "text-muted"}`}
-            />
-            <span className="min-w-0">
-              {leaked
-                ? "A token value reached the ticket reply. This session was not contained."
-                : contained
-                  ? "The injection still happened. The leak did not: the token read and the write were refused."
-                  : `${asc.length} decision${asc.length === 1 ? "" : "s"} on this session so far.`}
-            </span>
-          </p>
+          {!playing && (
+            <p
+              className={`flex items-start gap-2 rounded-xl border bg-panel px-4 py-3 text-sm leading-snug ${
+                leaked ? "border-deny/50" : contained ? "border-allow/40" : "border-line"
+              }`}
+            >
+              <Icon
+                name={leaked ? "alert" : "shield"}
+                className={`mt-0.5 h-4 w-4 shrink-0 ${leaked ? "text-deny" : contained ? "text-allow" : "text-muted"}`}
+              />
+              <span className="min-w-0">
+                {leaked
+                  ? "A token value reached the ticket reply. This session was not contained."
+                  : contained
+                    ? "The injection still happened. The leak did not: the token read and the write were refused."
+                    : `${seq.length} decision${seq.length === 1 ? "" : "s"} on this session so far.`}
+              </span>
+            </p>
+          )}
         </>
       ) : (
         <div className="rounded-xl border border-line bg-panel">
           <Empty>
             No live decisions yet. Run the attack from the Victim app with the Breaker on, or run a scenario in the SQL Breaker tab, and it
-            shows up here.
+            plays here.
           </Empty>
         </div>
       )}
